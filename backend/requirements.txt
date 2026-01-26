@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+openai
+faster-whisper
+pydub
+pydantic
+python-dotenv
+aiofiles

@@ -1,0 +1,16 @@
+backend/ffmpeg.exe
+backend/ffprobe.exe
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+dist/
+
+# Logs
+error_log.txt
+
+# Large binaries
+*.exe
