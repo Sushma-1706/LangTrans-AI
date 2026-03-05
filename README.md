@@ -45,13 +45,6 @@ PORT=8000
 
 ⚠️ Never commit your `.env` file to GitHub.
 
-You may create a `.env.example` file:
-
-```env
-GROQ_API_KEY=your_api_key_here
-PORT=8000
-```
-
 ---
 
 ## 📦 Installation & Setup
