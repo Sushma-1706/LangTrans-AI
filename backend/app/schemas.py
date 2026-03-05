@@ -1,10 +1,12 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class TranscriptSegment(BaseModel):
     start: float
     end: float
     text: str
+
 
 class SummaryResult(BaseModel):
     title: str
@@ -19,10 +21,17 @@ class SummaryResult(BaseModel):
     summary_length: str
     compression_ratio: str
 
+
 class JobStatus(BaseModel):
     job_id: str
-    status: str  # "processing", "completed", "failed"
-    progress: int # 0-100
+    status: str  # "queued", "processing", "completed", "failed"
+    progress: int  # 0-100
+
     result: Optional[SummaryResult] = None
     transcript: Optional[List[TranscriptSegment]] = None
+    translation: Optional[List[TranscriptSegment]] = None
+    detected_language: Optional[str] = None
+
+    source_name: Optional[str] = None
+    source_type: Optional[str] = None
     error: Optional[str] = None

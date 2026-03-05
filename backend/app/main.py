@@ -1,22 +1,18 @@
-import uuid
+# backend/app/main.py
 import os
 import shutil
 import traceback
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Form
+import uuid
+
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from app.services import media_service, stt_service, llm_service
+
 from app.schemas import JobStatus
+from app.services import llm_service, media_service, stt_service
+from app.services.media_service import MediaDownloadError
 
-# --- FIX FOR WINDOWS FFMPEG ---
-import os
-current_dir = os.path.dirname(os.path.abspath(__file__)) 
-backend_dir = os.path.dirname(current_dir)
-os.environ["PATH"] += os.pathsep + backend_dir
-# ------------------------------
+app = FastAPI(title="LangTrans AI")
 
-app = FastAPI(title="Distill AI")
-
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,85 +20,121 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database
 jobs_db = {}
 TEMP_DIR = "temp"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# --- BACKGROUND TASK ---
-def process_file_task(job_id: str, file_path: str, original_filename: str, translate: bool):
-    """
-    Background task that runs the AI pipeline.
-    Now accepts 'translate' boolean.
-    """
+
+def process_media_task(
+    job_id: str,
+    input_path: str,
+    source_name: str,
+    source_type: str,
+    translate: bool,
+):
+    audio_path = os.path.join(TEMP_DIR, f"{job_id}.wav")
     try:
         jobs_db[job_id]["status"] = "processing_audio"
         jobs_db[job_id]["progress"] = 10
-        print(f"👉 [Job {job_id}] Processing Audio...")
-        
-        # 1. Media Handling
-        audio_path = os.path.join(TEMP_DIR, f"{job_id}.wav")
-        media_service.extract_audio(file_path, audio_path)
+
+        media_service.extract_audio(input_path, audio_path)
         duration = media_service.get_duration(audio_path)
-        
+
         jobs_db[job_id]["status"] = "transcribing"
         jobs_db[job_id]["progress"] = 30
-        print(f"👉 [Job {job_id}] Transcribing (Translate={translate})...")
-        
-        # 2. Transcription (Passes translate flag)
-        transcript_segments, full_text = stt_service.transcribe_audio(audio_path, translate=translate)
-        
+
+        stt_result = stt_service.transcribe_audio(audio_path, translate=translate)
+
         jobs_db[job_id]["status"] = "summarizing"
-        jobs_db[job_id]["progress"] = 70
-        print(f"👉 [Job {job_id}] Summarizing...")
-        
-        # 3. LLM Summarization
-        summary_json = llm_service.generate_final_summary(full_text, duration)
-        
-        # 4. Finalize
+        jobs_db[job_id]["progress"] = 75
+
+        summary_json = llm_service.generate_final_summary(stt_result["summary_text"], duration)
+
         jobs_db[job_id]["result"] = summary_json
-        jobs_db[job_id]["transcript"] = transcript_segments
+        jobs_db[job_id]["transcript"] = stt_result["transcript_segments"]
+        jobs_db[job_id]["translation"] = stt_result["translation_segments"]
+        jobs_db[job_id]["detected_language"] = stt_result["detected_language"]
+        jobs_db[job_id]["source_type"] = source_type
+        jobs_db[job_id]["source_name"] = source_name
         jobs_db[job_id]["status"] = "completed"
         jobs_db[job_id]["progress"] = 100
-        print(f"✅ [Job {job_id}] Completed!")
-        
-    except Exception as e:
-        print(f"❌ [Job {job_id}] FAILED: {e}")
+    except Exception as exc:
         traceback.print_exc()
         jobs_db[job_id]["status"] = "failed"
-        jobs_db[job_id]["error"] = str(e)
+        jobs_db[job_id]["error"] = str(exc)
+        jobs_db[job_id]["progress"] = 100
     finally:
-        # Cleanup
-        if os.path.exists(file_path): os.remove(file_path)
-        if os.path.exists(audio_path): os.remove(audio_path)
+        for path in (input_path, audio_path):
+            if path and os.path.exists(path):
+                os.remove(path)
 
-# --- API ENDPOINTS ---
+
+def process_url_task(job_id: str, media_url: str, translate: bool):
+    try:
+        jobs_db[job_id]["status"] = "downloading"
+        jobs_db[job_id]["progress"] = 5
+        downloaded_path, derived_name = media_service.download_media_from_url(media_url, TEMP_DIR, job_id)
+    except MediaDownloadError as exc:
+        jobs_db[job_id]["status"] = "failed"
+        jobs_db[job_id]["progress"] = 100
+        jobs_db[job_id]["error"] = str(exc)
+        return
+
+    process_media_task(job_id, downloaded_path, derived_name, "url", translate)
+
 
 @app.post("/upload", response_model=JobStatus)
 async def upload_file(
-    background_tasks: BackgroundTasks, 
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    translate: bool = Form(False) # <--- Accepts the flag from Frontend
+    translate: bool = Form(False),
 ):
     job_id = str(uuid.uuid4())
     file_path = os.path.join(TEMP_DIR, f"{job_id}_{file.filename}")
-    
-    # Save uploaded file
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
-    # Init Job
+
     jobs_db[job_id] = {
         "job_id": job_id,
         "status": "queued",
         "progress": 0,
-        "result": None
+        "result": None,
+        "source_name": file.filename,
+        "source_type": "file",
     }
-    
-    # Start Task (Passes translate flag)
-    background_tasks.add_task(process_file_task, job_id, file_path, file.filename, translate)
-    
+
+    background_tasks.add_task(
+        process_media_task,
+        job_id,
+        file_path,
+        file.filename,
+        "file",
+        translate,
+    )
+
     return jobs_db[job_id]
+
+
+@app.post("/process-url", response_model=JobStatus)
+async def process_url(
+    background_tasks: BackgroundTasks,
+    media_url: str = Form(...),
+    translate: bool = Form(False),
+):
+    job_id = str(uuid.uuid4())
+    jobs_db[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 0,
+        "result": None,
+        "source_name": media_url,
+        "source_type": "url",
+    }
+
+    background_tasks.add_task(process_url_task, job_id, media_url, translate)
+    return jobs_db[job_id]
+
 
 @app.get("/job/{job_id}", response_model=JobStatus)
 def get_job_status(job_id: str):

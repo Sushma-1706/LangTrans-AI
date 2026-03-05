@@ -1,9 +1,10 @@
+# backend/requirements.txt
 fastapi
 uvicorn
 python-multipart
-openai
-faster-whisper
+groq
 pydub
-pydantic
 python-dotenv
-aiofiles
+requests
+langdetect
+yt-dlp
