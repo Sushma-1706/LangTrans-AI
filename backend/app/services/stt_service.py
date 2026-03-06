@@ -8,8 +8,8 @@ from groq import Groq
 from langdetect import detect
 from pydub import AudioSegment
 
-from app.config import GROQ_API_KEY
-from app.schemas import TranscriptSegment
+from backend.app.config import GROQ_API_KEY
+from backend.app.schemas import TranscriptSegment
 
 client = Groq(api_key=GROQ_API_KEY)
 CHUNK_DURATION_MS = 10 * 60 * 1000
