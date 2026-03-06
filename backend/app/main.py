@@ -7,8 +7,8 @@ import uuid
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import JobStatus
-from app.services import llm_service, media_service, stt_service
+from backend.app.schemas import JobStatus
+from backend.app.services import llm_service, media_service, stt_service
 from app.services.media_service import MediaDownloadError
 
 app = FastAPI(title="LangTrans AI")
