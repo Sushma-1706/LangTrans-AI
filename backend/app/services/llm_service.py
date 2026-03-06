@@ -1,7 +1,7 @@
 import os
 import json
 from groq import Groq
-from app.config import GROQ_API_KEY
+from backend.app.config import GROQ_API_KEY
 
 # Initialize Groq Client
 client = Groq(api_key=GROQ_API_KEY)
