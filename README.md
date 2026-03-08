@@ -30,8 +30,9 @@ It supports:
 - 🔄 Optional English translation
 - 📊 AI-generated structured summaries
 - ⏱ Timestamped transcript segments
-- 📦 JSON output for downstream analysis
-  ---
+    ---
+📦 JSON output for downstream analysis
+
   
 ## 🧱 Tech stack
 
