@@ -30,10 +30,10 @@ It supports:
 - 🔄 Optional English translation
 - 📊 AI-generated structured summaries
 - ⏱ Timestamped transcript segments
-    ---
-📦 JSON output for downstream analysis
-
+- 📦 JSON output for downstream analysis
   
+    ---
+
 ## 🧱 Tech stack
 
 ### Frontend
@@ -93,6 +93,7 @@ GROQ_API_KEY=your_api_key_here
   - as local binaries in `backend/` named `ffmpeg.exe` and `ffprobe.exe`, **or**
   - installed on system `PATH` as `ffmpeg`/`ffprobe`
 - (Recommended) `yt-dlp` installed for robust URL/YouTube ingestion
+  
   ---
   
 ## 🚀 Local setup
@@ -158,6 +159,7 @@ Poll this endpoint for status updates and final payload.
 `queued → downloading/processing_audio → transcribing → summarizing → completed`
 
 `failed` includes an error string.
+
 ---
 ## 🧪 Useful diagnostics
 From `backend/`:
