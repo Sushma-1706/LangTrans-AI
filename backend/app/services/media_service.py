@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
-from backend.app.config import MAX_REMOTE_BYTES
+from app.config import MAX_REMOTE_BYTES
 
 SUPPORTED_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".mp4", ".mov", ".mkv", ".webm", ".avi", ".mpeg", ".mpg"}
 

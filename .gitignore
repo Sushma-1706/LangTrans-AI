@@ -1,18 +1,31 @@
-backend/ffmpeg.exe
-backend/ffprobe.exe
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
 .env
+.env.*
+!.env.example
 
 # Node
 node_modules/
-dist/
+frontend/dist/
 
-
-# Large binaries
-*.exe
-
-backend/temp/
-backend/venv/
-frontend/.env
+# Temporary/media files
+tmp/
+temp/
+uploads/
+*.mp3
+*.wav
+*.mp4
+*.webm
+backend/.venv/
+backend/ffmpeg.exe
+backend/ffprobe.exe

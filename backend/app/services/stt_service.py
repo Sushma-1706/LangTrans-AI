@@ -5,8 +5,8 @@ from pathlib import Path
 from groq import Groq
 from langdetect import detect
 from pydub import AudioSegment
-from backend.app.config import require_groq_key
-from backend.app.schemas import TranscriptSegment
+from app.config import require_groq_key
+from app.schemas import TranscriptSegment
 
 CHUNK_DURATION_MS = 10 * 60 * 1000
 
@@ -44,7 +44,7 @@ def translate_segments(segments: list[TranscriptSegment], target_language: str) 
     for offset in range(0, len(segments), 50):
         batch = segments[offset:offset + 50]
         source = "\n".join(f"{number}. {segment.text}" for number, segment in enumerate(batch, 1))
-        response = _client().chat.completions.create(model="llama-3.3-70b-versatile", temperature=0,
+        response = _client().chat.completions.create(model="openai/gpt-oss-120b", temperature=0,
             messages=[{"role":"system", "content":f"Translate every numbered line into {target_language}. Preserve line count, order, intent and names. Return numbered translations only; no commentary."}, {"role":"user", "content":source}])
         lines = response.choices[0].message.content.strip().splitlines()
         texts = []

@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Annotated
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from backend.app.config import CORS_ORIGINS, MAX_UPLOAD_BYTES, TEMP_DIR
-from backend.app.schemas import CompletedJobResult, JobCreationResponse, JobState, JobStatusResponse, Transcript, Translation
-from backend.app.services import llm_service, media_service, stt_service
+from app.config import CORS_ORIGINS, MAX_UPLOAD_BYTES, TEMP_DIR
+from app.schemas import CompletedJobResult, JobCreationResponse, JobState, JobStatusResponse, Transcript, Translation
+from app.services import llm_service, media_service, stt_service
 
 app = FastAPI(title="LangTrans-AI", description="Multilingual audio and video intelligence API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=False, allow_methods=["GET", "POST"], allow_headers=["*"])
