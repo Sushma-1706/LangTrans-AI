@@ -12,3 +12,7 @@ dist/
 
 # Large binaries
 *.exe
+
+backend/temp/
+backend/venv/
+frontend/.env

@@ -1,244 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { UploadCloud, FileText, PlayCircle, CheckCircle, Download, History, Sparkles, Languages, Trash2, Link2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronRight, Clipboard, Download, FileAudio, Github, Globe2, Languages, Link2, LoaderCircle, Play, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import { getJob, submitFile, submitUrl } from './services/api';
 import './App.css';
-
-const API_URL = "http://localhost:8000";
-
+const supported = ['mp3','wav','m4a','aac','ogg','flac','mp4','mov','mkv','webm','avi','mpeg','mpg'];
+const languages = ['English','Spanish','French','German','Portuguese','Hindi','Japanese','Korean','Chinese (Simplified)','Arabic','Italian','Russian','Turkish','Indonesian'];
+const formatSize = (n) => n < 1024**2 ? `${(n/1024).toFixed(1)} KB` : `${(n/1024**2).toFixed(1)} MB`;
+const time = n => `${String(Math.floor(n/60)).padStart(2,'0')}:${String(Math.floor(n%60)).padStart(2,'0')}`;
 function App() {
-  const [file, setFile] = useState(null);
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [translate, setTranslate] = useState(false);
-  const [jobId, setJobId] = useState(null);
-  const [status, setStatus] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  
- 
-  const [history, setHistory] = useState([]);
-
-  // Load History
-  useEffect(() => {
-    const saved = localStorage.getItem('ai_summary_history');
-    if (saved) setHistory(JSON.parse(saved));
-  }, []);
-  
-
-  // Save to History
-  const addToHistory = (resultData) => {
-    const newEntry = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      fileName: file ? file.name : (mediaUrl || 'URL Source'),
-      result: resultData.result,
-      transcript: resultData.transcript,
-      translation: resultData.translation,
-      detected_language: resultData.detected_language,
-    };
-    
-    const updatedHistory = [newEntry, ...history].slice(0, 15);
-    setHistory(updatedHistory);
-    localStorage.setItem('ai_summary_history', JSON.stringify(updatedHistory));
-  };
-
-  // --- NEW: Delete Function ---
-  const deleteHistoryItem = (e, id) => {
-    e.stopPropagation(); // Prevents the item from opening when you click delete
-    const updatedHistory = history.filter(item => item.id !== id);
-    setHistory(updatedHistory);
-    localStorage.setItem('ai_summary_history', JSON.stringify(updatedHistory));
-  };
-
-  const loadFromHistory = (entry) => {
-        setData({
-      result: entry.result,
-      transcript: entry.transcript,
-      translation: entry.translation,
-      detected_language: entry.detected_language,
-    });
-    setStatus('completed');
-  };
-
-  const startJob = async () => {
-    if (!file && !mediaUrl.trim()) return alert('Upload a file or paste a media URL.');
-
-    try {
-      setLoading(true);
-      setProgress(10);
-      setData(null);
-      
-       if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('translate', translate);
-        const res = await axios.post(`${API_URL}/upload`, formData);
-        setJobId(res.data.job_id);
-      } else {
-        const formData = new FormData();
-        formData.append('media_url', mediaUrl.trim());
-        formData.append('translate', translate);
-        const res = await axios.post(`${API_URL}/process-url`, formData);
-        setJobId(res.data.job_id);
-      }
-      setStatus('queued');
-    } catch (err) {
-      console.error(err);
-      setLoading(false);
-      alert('Submission failed.');
-    }
-  };
-
-  useEffect(() => {
-    let interval;
-    if (jobId && status !== 'completed' && status !== 'failed') {
-      interval = setInterval(async () => {
-        try {
-          const res = await axios.get(`${API_URL}/job/${jobId}`);
-          setStatus(res.data.status);
-          setProgress(res.data.progress || 20);
-
-          if (res.data.status === 'completed') {
-            setData(res.data);
-            setLoading(false);
-            setProgress(100);
-            addToHistory(res.data);
-          } else if (res.data.status === 'failed') {
-            setLoading(false);
-            alert('Job failed: ' + res.data.error);
-          }
-          } catch (e) {
-          console.error(e);
-        }
-      }, 2000);
-    }
-    return () => clearInterval(interval);
-  }, [jobId, status]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const downloadJSON = () => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([JSON.stringify(data.result, null, 2)], { type: 'application/json' }));
-    link.download = "summary_report.json";  
-    link.click();
-  };
-
-  const downloadTranscript = (segments, name) => {
-    if (!segments) return;
-    const textContent = segments.map(s => `[${formatTime(s.start)} - ${formatTime(s.end)}] ${s.text}`).join('\n');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([textContent], { type: 'text/plain' }));
-    link.download = name;
-    link.click();
-  };
-
-  return (
-    <div className="app-layout">
-      
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="logo-area"><Sparkles size={24} color="#a5b4fc" /><span>LangTrans-AI</span></div>
-        
-        <h3><History size={16}/> History</h3>
-        <div className="history-list">
-          {history.length === 0 && <p className="empty-history">No history yet.</p>}
-          {history.map(item => (
-            <div key={item.id} className="history-item" onClick={() => loadFromHistory(item)}>
-              
-              {/* Content (Clickable) */}
-              <div className="history-content">
-                <div className="history-title">{item.result.title || item.fileName}</div>
-                <div className="history-date">{format(new Date(item.date), 'MMM d, h:mm a')}</div>
-              </div>
-
-              <button className="delete-btn" onClick={(e) => deleteHistoryItem(e, item.id)} title="Delete this summary"><Trash2 size={16} /></button>
-
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="main-content">
-        <div className="center-wrapper">
-          
-          <div className="hero-header">
-            <h1>Multimodal AI Summarizer</h1>
-            <p>Upload any audio/video file or paste a direct media URL.</p>
-          </div>
-
-          {/* UPLOAD CARD */}
-          <div className="glass-card">
-            <div className="upload-area">
-              <UploadCloud size={48} color="#6366f1" />
-<p style={{marginTop: '15px', color: '#64748b'}}>{file ? `Selected: ${file.name}` : 'Drag & Drop or Click to Upload'}</p>
-              <input type="file" id="fileInput" style={{display:'none'}} onChange={(e) => setFile(e.target.files[0])} accept="audio/*,video/*" />
-              <button className="upload-btn" onClick={() => document.getElementById('fileInput').click()}>Choose File</button>
-            </div>
-
-            <div style={{marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center'}}>
-              <Link2 size={16} color="#475569"/>
-              <input
-                type="url"
-                placeholder="Or paste direct media URL (http/https)"
-                value={mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
-                style={{width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1'}}
-              />
-              
-            </div>
-
-            <div style={{marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-              <input type="checkbox" id="transToggle" checked={translate} onChange={(e) => setTranslate(e.target.checked)} style={{width: '18px', height: '18px', cursor: 'pointer', accentColor: '#6366f1'}} />
-              <label htmlFor="transToggle" style={{cursor: 'pointer', fontSize: '0.95rem', color: '#475569', display:'flex', alignItems:'center', gap:'6px'}}><Languages size={16} /> Translate transcript to English</label>
-            </div>
-
-           {loading && <div style={{marginTop: '25px'}}><p style={{marginBottom:'5px', fontSize:'0.9rem', color:'#64748b'}}>Status: <b>{status?.replace('_', ' ').toUpperCase()}</b></p><div style={{background: '#e2e8f0', height: '8px', borderRadius: '4px', overflow:'hidden'}}><div style={{width: `${progress}%`, background: '#6366f1', height: '100%', transition: 'width 0.5s ease'}}></div></div></div>}
-            {!loading && (file || mediaUrl.trim()) && <button className="upload-btn" style={{marginTop:'25px'}} onClick={startJob}><Sparkles size={18}/> Generate Summary</button>}
-          </div>
-
-          {/* RESULTS */}
-          {data && data.result && (
-            <div className="glass-card result-container">
-             <div className="result-header"><h2>{data.result.title}</h2><div style={{display:'flex', gap:'10px'}}><span className="badge">⏱ {data.result.duration}</span><span className="badge">📉 {data.result.compression_ratio}</span></div></div>
-              {data.detected_language && <p style={{textAlign:'left', color:'#475569'}}><b>Detected language:</b> {data.detected_language}</p>}
-
-              <div style={{textAlign:'left'}}><h3>Executive Summary</h3><p style={{lineHeight: '1.6', color: '#334155'}}>{data.result.executive_summary}</p></div>
-
-
-              <div className="grid-2">
-                <div className="info-box"><h3><FileText size={18}/> Key Topics</h3><ul>{data.result.key_topics?.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
-                <div className="info-box"><h3><CheckCircle size={18}/> Action Items</h3><ul>{data.result.action_items?.map((t, i) => <li key={i}>{t}</li>)}</ul></div>
-              </div>
-
-              <div style={{textAlign:'left', marginTop:'30px'}}>
-                 <h3><PlayCircle size={18}/> Transcript (with timestamps)</h3>
-                 <div className="transcript-preview">{data.transcript?.slice(0, 80).map((seg, i) => <div key={i} className="t-row"><span className="t-time">{formatTime(seg.start)}</span><span>{seg.text}</span></div>)}</div>
-              </div>
-              {data.translation && (
-                <div style={{textAlign:'left', marginTop:'24px'}}>
-                  <h3><Languages size={18}/> English Translation (with timestamps)</h3>
-                  <div className="transcript-preview">{data.translation.slice(0, 80).map((seg, i) => <div key={i} className="t-row"><span className="t-time">{formatTime(seg.start)}</span><span>{seg.text}</span></div>)}</div>
-                </div>
-              )}
-              <div style={{marginTop: '25px', display:'flex', gap:'15px', justifyContent:'center'}}>
-                 <button className="upload-btn" style={{background:'#334155', margin:0}} onClick={downloadJSON}><Download size={18}/> JSON Report</button>
-                <button className="upload-btn" style={{background:'#334155', margin:0}} onClick={() => downloadTranscript(data.transcript, 'transcript.txt')}><Download size={18}/> Transcript</button>
-                {data.translation && <button className="upload-btn" style={{background:'#334155', margin:0}} onClick={() => downloadTranscript(data.translation, 'translation_en.txt')}><Download size={18}/> Translation</button>}
-              </div>
-            </div>
-          )}
-
-        </div>
-      </main>
-    </div>
-  );
-}
-
+ const [mode,setMode]=useState('file'), [file,setFile]=useState(null), [url,setUrl]=useState(''), [translate,setTranslate]=useState(false), [target,setTarget]=useState('English'), [job,setJob]=useState(null), [error,setError]=useState(''), [drag,setDrag]=useState(false); const input=useRef();
+ const choose = item => { if (!item) return; const ext=item.name.split('.').pop().toLowerCase(); if(!supported.includes(ext)){setError(`Unsupported file type. Choose: ${supported.join(', ')}.`);return;} setError('');setFile(item);setMode('file'); };
+ const validUrl = value => { try { const parsed=new URL(value); return ['http:','https:'].includes(parsed.protocol); } catch { return false; } };
+ const jobId = job?.job_id; const jobStatus = job?.status;
+ const start = async () => { setError(''); if(mode==='file'&&!file) return setError('Select an audio or video file first.'); if(mode==='url'&&!validUrl(url)) return setError('Enter a valid HTTP or HTTPS media URL.'); try { const response=mode==='file' ? await submitFile(file,translate,target) : await submitUrl(url.trim(),translate,target); setJob(response.data); } catch(e) { setError(e.response?.data?.detail || 'Could not reach the API. Check that the FastAPI server is running.'); } };
+ useEffect(()=>{ if(!jobId || ['completed','failed'].includes(jobStatus)) return; const poll=setInterval(async()=>{try {const {data}=await getJob(jobId);setJob(data)} catch {setError('Lost connection while checking this job.');clearInterval(poll)}},1800); return()=>clearInterval(poll);},[jobId,jobStatus]);
+ const result=job?.result; const copy = value => navigator.clipboard.writeText(value).catch(()=>setError('Clipboard access was unavailable.'));
+ const download = (name, content, type='text/plain') => {const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)};
+ return <div className="app"><header><a className="brand" href="#top"><span><Sparkles size={18}/></span>LangTrans<span className="accent">-AI</span></a><nav><a href="#workspace">Workspace</a><a href="#about">About</a><a aria-label="GitHub repository" href="https://github.com/Sushma-1706/LangTrans-AI" target="_blank" rel="noreferrer"><Github size={18}/></a><button className="nav-cta" onClick={()=>document.querySelector('#workspace').scrollIntoView({behavior:'smooth'})}>Start transcribing <ChevronRight size={16}/></button></nav></header>
+ <main id="top"><section className="hero"><div className="eyebrow"><Sparkles size={14}/> AUDIO & VIDEO INTELLIGENCE</div><h1>Turn every conversation into <em>actionable intelligence.</em></h1><p>Transcribe, translate into the language you choose, and extract structured insights from audio and video in one AI-powered workspace.</p><div className="trust"><span><Check/> Multilingual Whisper</span><span><Check/> Timestamped results</span><span><Check/> Secure server-side processing</span></div></section>
+ <section id="workspace" className="workspace"><div className="section-label">01 / CREATE ANALYSIS</div><h2>Bring your media to life.</h2><p className="sub">Choose an upload or a public media link. Your job runs asynchronously, so you can follow every real processing stage.</p><div className="tabs"><button className={mode==='file'?'active':''} onClick={()=>setMode('file')}><Upload size={17}/> Upload file</button><button className={mode==='url'?'active':''} onClick={()=>setMode('url')}><Link2 size={17}/> Paste URL</button></div>
+ {mode==='file'?<div className={`dropzone ${drag?'drag':''} ${file?'selected':''}`} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);choose(e.dataTransfer.files[0])}} onClick={()=>input.current.click()}><input ref={input} type="file" accept="audio/*,video/*" onChange={e=>choose(e.target.files[0])}/>{file?<><div className="file-icon"><FileAudio/></div><div><b>{file.name}</b><small>{file.type || 'Media file'} · {formatSize(file.size)}</small></div><button className="icon-btn" onClick={e=>{e.stopPropagation();setFile(null)}} aria-label="Remove selected file"><X/></button></>:<><div className="upload-icon"><Upload/></div><b>Drop audio or video here, or <u>browse files</u></b><small>MP3, WAV, M4A, MP4, MOV, MKV, WEBM and more · Max 500 MB</small></>}</div>:<div className="url-field"><Globe2/><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://youtube.com/watch?v=... or direct media URL"/><span>{validUrl(url)?<Check className="valid"/>:null}</span></div>}
+ <div className="options"><div><div className="option-title"><Languages size={18}/> Translation</div><p>Keep the original transcript and add a translated version.</p></div><label className="switch"><input type="checkbox" checked={translate} onChange={e=>setTranslate(e.target.checked)}/><span/></label></div>{translate&&<div className="language-row"><label htmlFor="target">Translate into</label><select id="target" value={target} onChange={e=>setTarget(e.target.value)}>{languages.map(l=><option key={l}>{l}</option>)}</select></div>}
+ {error&&<div className="alert">{error}<button onClick={()=>setError('')}><X size={16}/></button></div>}<button className="primary" disabled={job&&!['completed','failed'].includes(job.status)} onClick={start}>{job&&!['completed','failed'].includes(job.status)?<LoaderCircle className="spin"/>:<Play size={17}/>} {job&&!['completed','failed'].includes(job.status)?'Processing media…':'Start processing'}</button></section>
+ {job&&<section className={`job-card ${job.status}`}><div className="job-top"><div><span className="section-label">LIVE JOB</span><h3>{job.status==='failed'?'Something needs attention':job.status==='completed'?'Analysis complete':'Working on your media'}</h3><p>{job.message}</p></div><span className="status-pill">{job.status.replaceAll('_',' ')}</span></div><div className="progress"><i style={{width:`${job.progress}%`}}/></div><div className="job-meta"><span>Job ID: <code>{job.job_id}</code></span><strong>{job.progress}%</strong></div>{job.error&&<p className="job-error">{job.error}</p>}</section>}
+ {result&&<section className="results"><div className="results-heading"><div><div className="section-label">02 / RESULTS</div><h2>{result.summary.title}</h2><p>Detected speech: <b>{result.transcript.language}</b>{result.translation?` · Translated to ${result.translation.language}`:''}</p></div><div className="exports"><button onClick={()=>copy(result.transcript.segments.map(s=>`[${time(s.start)}] ${s.text}`).join('\n'))}><Clipboard/> Copy transcript</button><button onClick={()=>download('langtrans-result.json',JSON.stringify(job,null,2),'application/json')}><Download/> JSON</button></div></div><div className="summary-grid"><article className="summary-lead"><span>AI SUMMARY</span><h3>{result.summary.title}</h3><p>{result.summary.key_points[0]||'No key points were returned for this recording.'}</p></article>{[['Key points',result.summary.key_points],['Topics',result.summary.topics],['Action items',result.summary.action_items],['Keywords',result.summary.keywords]].map(([title,items])=><article className="summary-card" key={title}><h3>{title}</h3>{items.length?<ul>{items.map((x,i)=><li key={i}>{x}</li>)}</ul>:<p>None identified.</p>}</article>)}</div>{result.summary.quotes.length>0&&<article className="quotes"><h3>Notable quotes</h3>{result.summary.quotes.map((quote,i)=><blockquote key={i}>“{quote}”</blockquote>)}</article>}<div className={result.translation?'transcript-grid':'single-transcript'}><Transcript title={`Original transcript · ${result.transcript.language}`} segments={result.transcript.segments} onDownload={()=>download('transcript.txt',result.transcript.segments.map(s=>`[${time(s.start)} – ${time(s.end)}] ${s.text}`).join('\n'))}/>{result.translation&&<Transcript title={`Translation · ${result.translation.language}`} segments={result.translation.segments} onDownload={()=>download('translation.txt',result.translation.segments.map(s=>`[${time(s.start)} – ${time(s.end)}] ${s.text}`).join('\n'))}/>}</div></section>}</main><footer id="about">Built for clearer conversations, in every language. <span>Groq Whisper + Llama · In-memory job history clears on backend restart.</span></footer></div> }
+function Transcript({title,segments,onDownload}) {return <article className="transcript"><div><h3>{title}</h3><button onClick={onDownload}><Download size={15}/> TXT</button></div><div className="segment-list">{segments.length?segments.map((s,i)=><p key={i}><time>{time(s.start)}</time><span>{s.text}</span></p>):<p className="empty">No transcript segments available.</p>}</div></article>}
 export default App;

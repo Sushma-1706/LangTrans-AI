@@ -1,37 +1,53 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from enum import Enum
+from typing import Optional
+from pydantic import BaseModel, Field
 
+class JobState(str, Enum):
+    queued = "queued"
+    downloading = "downloading"
+    processing_audio = "processing_audio"
+    transcribing = "transcribing"
+    translating = "translating"
+    summarizing = "summarizing"
+    completed = "completed"
+    failed = "failed"
 
 class TranscriptSegment(BaseModel):
-    start: float
-    end: float
+    start: float = Field(ge=0)
+    end: float = Field(ge=0)
     text: str
 
+class Transcript(BaseModel):
+    language: str
+    segments: list[TranscriptSegment]
 
-class SummaryResult(BaseModel):
+class Translation(BaseModel):
+    language: str
+    segments: list[TranscriptSegment]
+
+class StructuredSummary(BaseModel):
     title: str
-    duration: str
-    executive_summary: str
-    detailed_summary: str
-    key_topics: List[str]
-    key_points: List[str]
-    important_quotes: List[str]
-    action_items: List[str]
-    keywords: List[str]
-    summary_length: str
-    compression_ratio: str
+    key_points: list[str] = []
+    topics: list[str] = []
+    action_items: list[str] = []
+    quotes: list[str] = []
+    keywords: list[str] = []
 
+class CompletedJobResult(BaseModel):
+    transcript: Transcript
+    translation: Optional[Translation] = None
+    summary: StructuredSummary
 
-class JobStatus(BaseModel):
+class JobCreationResponse(BaseModel):
     job_id: str
-    status: str  # "queued", "processing", "completed", "failed"
-    progress: int  # 0-100
+    status: JobState
+    progress: int = Field(ge=0, le=100)
+    message: str
 
-    result: Optional[SummaryResult] = None
-    transcript: Optional[List[TranscriptSegment]] = None
-    translation: Optional[List[TranscriptSegment]] = None
-    detected_language: Optional[str] = None
-
+class JobStatusResponse(JobCreationResponse):
     source_name: Optional[str] = None
-    source_type: Optional[str] = None
+    result: Optional[CompletedJobResult] = None
     error: Optional[str] = None
+
+class ErrorResponse(BaseModel):
+    detail: str
